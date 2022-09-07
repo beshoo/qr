@@ -6,10 +6,10 @@ class ForgotPasswordController extends Controller
 {
     public function index()
     {
-
     }
 
-    public function forgot() {
+    public function forgot()
+    {
         $credentials = request()->validate(['email' => 'required|email']);
 
         Password::sendResetLink($credentials);
@@ -17,8 +17,8 @@ class ForgotPasswordController extends Controller
         return $this->respondWithMessage('Reset password link sent on your email id.');
     }
 
-
-    public function reset(ResetPasswordRequest $request) {
+    public function reset(ResetPasswordRequest $request)
+    {
         $reset_password_status = Password::reset($request->validated(), function ($user, $password) {
             $user->password = bcrypt($password);
             $user->save();
@@ -28,6 +28,6 @@ class ForgotPasswordController extends Controller
             return $this->respondBadRequest(ApiCode::INVALID_RESET_PASSWORD_TOKEN);
         }
 
-        return $this->respondWithMessage("Password has been successfully changed");
+        return $this->respondWithMessage('Password has been successfully changed');
     }
 }

@@ -1,69 +1,103 @@
 <?php
 
-
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Str;
-
 
 class AuthController extends Controller
 {
-    public function index()
+    /**
+     * Create a new AuthController instance.
+     *
+     * @return void
+     */
+    public function __construct(Request $request)
     {
-
-    }
-
-
-    public function login(Request $request)
-    {
-        $this->getValidate($request);
-        if (!Auth::attempt($request->only('email', 'password'))) {
-
-            return response()->json([
-                'message' => 'invalid_credential',
-                'success' => false
-            ], 401);
-        }
-        $user = User::where('email', $request['email'])->firstOrFail();
-        $user->tokens()->delete();
-        $access_token = $user->createToken('trexQr')->plainTextToken;
-
-        return response([
-            'access_token' => $access_token,
-            'token_type' => 'Bearer',
-            'success' => true,
-            'user' => $user
-        ], 201);
-
+        //  $this->middleware('auth:api', ['except' => ['login']]);
     }
 
     /**
-     * @param Request $request
-     * @return void
+     * Get a JWT via given credentials.
+     *
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function getValidate(Request $request): void
+    public function login(Request $request)
     {
-        $is_login = Str::contains(Route::currentRouteAction(), '@login');
-        $validate_items = [
-            'name' => $is_login ? '' : 'required|unique:users,name',
-            'email' => $is_login ? 'email|required|min:3' : 'email|required|min:3|unique:users,email',
-            'password' => 'required'];
-        $request->validate($validate_items);
+        $credentials = $request->only('email', 'password');
+        if ($token = $this->guard()->attempt($credentials)) {
+            $user = Auth::guard('api')->user();
+            if (! $user->hasVerifiedEmail()) {
+                return response()->json([
+                    'message' => 'We have sent you a verification email, please check your inbox, and also check your spam folder!',
+                    'success' => false,
+                ], 401);
+            }
+
+            return $this->respondWithToken($token);
+        }
+
+        return response()->json([
+            'message' => 'Invalid Credentials',
+            'success' => false,
+        ], 401);
     }
 
-    public function logout(Request $request)
+    /**
+     * Get the guard to be used during authentication.
+     *
+     * @return \Illuminate\Contracts\Auth\Guard
+     */
+    public function guard()
     {
-        Auth::user()->tokens()->delete();
-        return response([
-            'access_token' => null,
-            'message' => 'loged_out',
-            'success' => true,
-        ], 201);
+        return Auth::guard();
     }
 
+    /**
+     * Get the token array structure.
+     *
+     * @param  string  $token
+     * @return \Illuminate\Http\JsonResponse
+     */
+    protected function respondWithToken($token)
+    {
+        return response()->json([
+            'access_token' => $token,
+            'token_type' => 'bearer',
+            'expires_in' => $this->guard()->factory()->getTTL() * 60,
+            'user' => Auth::user(),
+        ]);
+    }
 
+    /**
+     * Get the authenticated User.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function me()
+    {
+        return response()->json(auth()->user());
+    }
+
+    /**
+     * Log the user out (Invalidate the token).
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function logout()
+    {
+        auth()->logout();
+
+        return response()->json(['message' => 'Successfully logged out', 'success' => true]);
+    }
+
+    /**
+     * Refresh a token.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function token_refresh()
+    {
+        return $this->respondWithToken(auth()->refresh());
+    }
 }

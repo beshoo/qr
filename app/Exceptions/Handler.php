@@ -2,8 +2,14 @@
 
 namespace App\Exceptions;
 
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Throwable;
+use Tymon\JWTAuth\Exceptions\TokenBlacklistedException;
 
 class Handler extends ExceptionHandler
 {
@@ -47,12 +53,57 @@ class Handler extends ExceptionHandler
             //
         });
 
-        $this->renderable(function (NotFoundHttpException $e, $request)
-        {
+        $this->renderable(function (NotFoundHttpException $e, $request) {
             return response()->json([
                 'success' => false,
-                'message' => 'router_notfound',
+                'message' => 'Router Not Found',
             ]);
+        });
+
+        $this->renderable(function (AuthenticationException $e, $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+        });
+
+        $this->renderable(function (MethodNotAllowedHttpException $e, $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 500);
+            }
+        });
+
+        $this->renderable(function (TokenBlacklistedException $e, $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 400);
+            }
+        });
+
+        $this->renderable(function (ValidationException $e, $request) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                    'errors' => $e->validator->errors(),
+                ], 400);
+            }
+        });
+
+        $this->renderable(function (QueryException $e, $request) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 400);
+            }
         });
     }
 }

@@ -20,8 +20,8 @@ class RegistrationRequest extends FormRequest
         return true;
     }
 
-    public function getAttributes() {
+    public function getAttributes()
+    {
         return $this->validated();
     }
-
 }

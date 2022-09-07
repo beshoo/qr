@@ -11,5 +11,6 @@ function queryToSQL($query, $logQuery = true)
     if ($logQuery) {
         Log::debug($sql);
     }
+
     return $sql;
 }
